@@ -1,23 +1,17 @@
 package verticles
 
-import com.github.kittinunf.fuel.httpGet
-import com.github.salomonbrys.kotson.get
-import com.github.salomonbrys.kotson.obj
-import com.github.salomonbrys.kotson.string
-import com.google.gson.JsonParser
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.Future
-import io.vertx.core.Vertx
 import io.vertx.ext.web.Router
+import io.vertx.ext.web.handler.StaticHandler
 import io.vertx.ext.web.templ.ThymeleafTemplateEngine
-import nl.komponents.kovenant.task
+import nl.komponents.kovenant.functional.bind
+import nl.komponents.kovenant.functional.map
 import org.slf4j.LoggerFactory
+import services.SunService
+import services.WeatherService
 import uy.klutter.vertx.VertxInit
-import java.nio.charset.Charset
 import java.text.SimpleDateFormat
-import java.time.ZoneId
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 import java.util.*
 
 class MainVerticle : AbstractVerticle() {
@@ -29,6 +23,13 @@ class MainVerticle : AbstractVerticle() {
 
     val templateEngine = ThymeleafTemplateEngine.create()
 
+    val staticHandler = StaticHandler.create().setWebRoot("public").setCachingEnabled(false)
+
+    val weatherService = WeatherService()
+    val sunService = SunService()
+
+    router.route("/public/*").handler(staticHandler)
+
     router.get("/").handler { routingContext ->
       val response = routingContext.response()
       response.end("Hello my dude!")
@@ -37,30 +38,24 @@ class MainVerticle : AbstractVerticle() {
     router.get("/home").handler { ctx ->
       ctx.put("time", SimpleDateFormat().format(Date()))
 
+      val lat = 32.7252
+      val lon = -97.3205
+
       // get sunrise and sunset info
-      val sunInfoP = task {
-        val url = "http://api.sunrise-sunset.org/json?lat=32.7252&lng=-97.3205&formatted=0"
-        val (_, response) = url.httpGet().responseString()
-        val jsonStr = String(response.data, Charset.forName("UTF-8"))
+      val sunInfoP = sunService.getSunInfo(lat, lon)
+      val temperatureP = weatherService.getTemperature(lat, lon)
 
-        val json = JsonParser().parse(jsonStr).obj
-        val sunrise = json["results"]["sunrise"].string
-        val sunset = json["results"]["sunset"].string
-
-        val sunriseTime = ZonedDateTime.parse(sunrise)
-        val sunsetTime = ZonedDateTime.parse(sunset)
-        val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
-            .withZone(ZoneId.of("America/Chicago"))
-
-        SunInfo(sunriseTime.format(formatter), sunsetTime.format(formatter))
+      val sunWeatherInfoP = sunInfoP.bind { sunInfo ->
+        temperatureP.map { temp -> SunWeatherInfo(sunInfo, temp) }
       }
 
-      sunInfoP.success { sunInfo ->
-        ctx.put("sunrise", sunInfo.sunrise)
-        ctx.put("sunset", sunInfo.sunset)
+      sunWeatherInfoP.success { info ->
+        ctx.put("sunrise", info.sunInfo.sunrise)
+        ctx.put("sunset", info.sunInfo.sunset)
+        ctx.put("temperature", info.temperature)
 
         templateEngine.render(ctx, "public/templates/", "index.html") { buf ->
-          if(buf.failed()) {
+          if (buf.failed()) {
             logger.error("Template rendering failed because ", buf.cause())
           } else {
             ctx.response().end(buf.result())
@@ -70,7 +65,7 @@ class MainVerticle : AbstractVerticle() {
     }
 
     server.requestHandler { router.accept(it) }.listen(8080) { handler ->
-      if(!handler.succeeded()) {
+      if (!handler.succeeded()) {
         logger.error("Failed to listen to port 8080")
       }
     }
@@ -78,3 +73,4 @@ class MainVerticle : AbstractVerticle() {
 }
 
 data class SunInfo(val sunrise: String, val sunset: String)
+data class SunWeatherInfo(val sunInfo: SunInfo, val temperature: Double)
