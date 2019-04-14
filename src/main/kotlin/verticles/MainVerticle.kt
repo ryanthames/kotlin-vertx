@@ -1,5 +1,6 @@
 package verticles
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import io.vertx.core.AbstractVerticle
 import io.vertx.core.Future
 import io.vertx.ext.web.Router
@@ -11,8 +12,6 @@ import org.slf4j.LoggerFactory
 import services.SunService
 import services.WeatherService
 import uy.klutter.vertx.VertxInit
-import java.text.SimpleDateFormat
-import java.util.*
 
 class MainVerticle : AbstractVerticle() {
   override fun start(startFuture: Future<Void>?) {
@@ -28,6 +27,8 @@ class MainVerticle : AbstractVerticle() {
     val weatherService = WeatherService()
     val sunService = SunService()
 
+    val jsonMapper = jacksonObjectMapper()
+
     router.route("/public/*").handler(staticHandler)
 
     router.get("/").handler { routingContext ->
@@ -36,31 +37,28 @@ class MainVerticle : AbstractVerticle() {
     }
 
     router.get("/home").handler { ctx ->
-      ctx.put("time", SimpleDateFormat().format(Date()))
+      templateEngine.render(ctx, "public/templates/", "index.html") { buf ->
+        if (buf.failed()) {
+          logger.error("Template rendering failed because ", buf.cause())
+        } else {
+          ctx.response().end(buf.result())
+        }
+      }
+    }
 
+    router.get("/api/data").handler { ctx ->
       val lat = 32.7252
       val lon = -97.3205
-
-      // get sunrise and sunset info
       val sunInfoP = sunService.getSunInfo(lat, lon)
       val temperatureP = weatherService.getTemperature(lat, lon)
-
       val sunWeatherInfoP = sunInfoP.bind { sunInfo ->
         temperatureP.map { temp -> SunWeatherInfo(sunInfo, temp) }
       }
 
       sunWeatherInfoP.success { info ->
-        ctx.put("sunrise", info.sunInfo.sunrise)
-        ctx.put("sunset", info.sunInfo.sunset)
-        ctx.put("temperature", info.temperature)
-
-        templateEngine.render(ctx, "public/templates/", "index.html") { buf ->
-          if (buf.failed()) {
-            logger.error("Template rendering failed because ", buf.cause())
-          } else {
-            ctx.response().end(buf.result())
-          }
-        }
+        val json = jsonMapper.writeValueAsString(info)
+        val response = ctx.response()
+        response.end(json)
       }
     }
 
