@@ -12,3 +12,4 @@ gradle
 .project
 *.iml
 node_modules/
+public/compiled/
