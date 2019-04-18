@@ -9,6 +9,11 @@ buildscript {
   ext.fuel_version = '1.15.0'
   ext.kotson_version = '2.5.0'
   ext.jackson_version = '2.9.4.1'
+  ext.hikari_version = '3.2.0'
+  ext.pgjdbc_version = '42.1.1'
+  ext.jbcrypt_version = '0.4.1'
+  ext.flyway_version = '4.2.0'
+  ext.kotliquery_version = '1.2.1'
 
   repositories {
     jcenter()
@@ -32,9 +37,12 @@ mainClassName = "io.vertx.core.Launcher"
 def mainVerticleName = 'verticles.MainVerticle'
 def watchForChange = 'src/**/*.kt'
 def doOnChange = 'gradle classes'
+def configurationFile = 'conf/development.json'
 
 run {
-  args = ['run', mainVerticleName, "--redeploy=$watchForChange", "--launcher-class=$mainClassName", "--on-redeploy=$doOnChange"]
+  args = ['run', mainVerticleName, "--redeploy=$watchForChange",
+          "--launcher-class=$mainClassName", "--on-redeploy=$doOnChange",
+          "-conf $configurationFile"]
 }
 
 repositories {
@@ -58,4 +66,9 @@ dependencies {
   compile "com.github.kittinunf.fuel:fuel:$fuel_version"
   compile "com.github.salomonbrys.kotson:kotson:$kotson_version"
   compile "com.fasterxml.jackson.module:jackson-module-kotlin:$jackson_version"
+  compile "com.zaxxer:HikariCP:$hikari_version"
+  compile "org.postgresql:postgresql:$pgjdbc_version"
+  compile "de.svenkubiak:jBCrypt:$jbcrypt_version"
+  compile "org.flywaydb:flyway-core:$flyway_version"
+  compile "com.github.seratch:kotliquery:$kotliquery_version"
 }
