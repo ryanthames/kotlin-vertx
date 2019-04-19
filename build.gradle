@@ -14,6 +14,7 @@ buildscript {
   ext.jbcrypt_version = '0.4.1'
   ext.flyway_version = '4.2.0'
   ext.kotliquery_version = '1.2.1'
+  ext.kotlintest_version = '3.1.10'
 
   repositories {
     jcenter()
@@ -71,4 +72,10 @@ dependencies {
   compile "de.svenkubiak:jBCrypt:$jbcrypt_version"
   compile "org.flywaydb:flyway-core:$flyway_version"
   compile "com.github.seratch:kotliquery:$kotliquery_version"
+
+  testCompile "io.kotlintest:kotlintest-runner-junit5:$kotlintest_version"
+}
+
+test {
+  useJUnitPlatform()
 }

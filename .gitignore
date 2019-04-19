@@ -13,3 +13,4 @@ gradle
 *.iml
 node_modules/
 public/compiled/
+out/
